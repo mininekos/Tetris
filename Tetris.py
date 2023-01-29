@@ -12,24 +12,24 @@ FPS = 60
 
 pygame.init()
 sc = pygame.display.set_mode(RES)
-game_sc = pygame.Surface(TAMVENTANA)
-clock = pygame.time.Clock()
+ventana_juego = pygame.Surface(TAMVENTANA)
+refresco_pantalla = pygame.time.Clock()
 
 lineasTablero = [pygame.Rect(x * TAMFILA, y * TAMFILA, TAMFILA, TAMFILA) for x in range(COLUMNAS) for y in range(FILAS)]
 
-posicionFiguras = [[(-1, 0), (-2, 0), (0, 0), (1, 0)],  #asd
-                   [(0, -1), (-1, -1), (-1, 0), (0, 0)],  #asd
-                   [(-1, 0), (-1, 1), (0, 0), (0, -1)],  #asd
-                   [(0, 0), (-1, 0), (0, 1), (-1, -1)],  #asd
-                   [(0, 0), (0, -1), (0, 1), (-1, -1)],  #asd
-                   [(0, 0), (0, -1), (0, 1), (1, -1)],  #asd
-                   [(0, 0), (0, -1), (0, 1), (-1, 0)]] #asd
+posicionFiguras = [[(-1, 0), (-2, 0), (0, 0), (1, 0)],  # PALO
+                   [(0, -1), (-1, -1), (-1, 0), (0, 0)],  # CUADRADO
+                   [(-1, 0), (-1, 1), (0, 0), (0, -1)],  # ZETA
+                   [(0, 0), (-1, 0), (0, 1), (-1, -1)],  # ZETA INVERTIDA
+                   [(0, 0), (0, -1), (0, 1), (-1, -1)],  # L
+                   [(0, 0), (0, -1), (0, 1), (1, -1)],  # J
+                   [(0, 0), (0, -1), (0, 1), (-1, 0)]] # MINI T
 
 figuras = [[pygame.Rect(x + COLUMNAS // 2, y + 1, 1, 1) for x, y in fig_pos] for fig_pos in posicionFiguras]
-figure_rect = pygame.Rect(0, 0, TAMFILA - 2, TAMFILA - 2)
+tam_linea_figura = pygame.Rect(0, 0, TAMFILA - 2, TAMFILA - 2)
 tablero = [[0 for i in range(COLUMNAS)] for j in range(FILAS)]
 
-anim_count, anim_speed, anim_limit = 0, 60, 2000
+contador_velocidad, velocidad_animacion, velocidad_limite = 0, 60, 2000
 
 bg = pygame.image.load('imagenes/1700.jpg').convert()
 game_bg = pygame.image.load('imagenes/1700.jpg').convert()
@@ -41,145 +41,155 @@ titulo = main_font.render('TETRIS', True, pygame.Color('darkorange'))
 txtScore = font.render('score: ', True, pygame.Color('green'))
 txtRecord = font.render('record: ', True, pygame.Color('purple'))
 
+colores=[(255, 0,   0  ),
+            (0,   150, 0  ),
+            (0,   0,   255),
+            (255, 120, 0  ),
+            (255, 255, 0  ),
+            (180, 0,   255),
+            (0,   220, 220)]
+
 get_color = lambda : (randrange(30, 256), randrange(30, 256), randrange(30, 256))
 
-figure, next_figure = deepcopy(choice(figuras)), deepcopy(choice(figuras))
-color, next_color = get_color(), get_color()
+figura_actual, siguiente_figura =deepcopy(choice(figuras)), deepcopy(choice(figuras))
+color_actual, siguiente_color = get_color(), get_color()
 
-score, comboLineas = 0, 0
+score, record, comboLineas = 0, 0, 0
+
 puntosCombo = {0: 0, 1: 100, 2: 300, 3: 700, 4: 1500}
 
 
-def check_borders():
-    if figure[i].x < 0 or figure[i].x > COLUMNAS - 1:
+# Comprobar si la pieza sale del tablero
+def comprobar_bordes():
+    if figura_actual[i].x < 0 or figura_actual[i].x > COLUMNAS - 1:
         return False
-    elif figure[i].y > FILAS - 1 or tablero[figure[i].y][figure[i].x]:
+    elif figura_actual[i].y > FILAS - 1 or tablero[figura_actual[i].y][figura_actual[i].x]:
         return False
     return True
 
-# quitar record
-def get_record():
-    try:
-        with open('record') as f:
-            return f.readline()
-    except FileNotFoundError:
-        with open('record', 'w') as f:
-            f.write('0')
-
-
-def set_record(record, score):
-    rec = max(int(record), score)
-    with open('record', 'w') as f:
-        f.write(str(rec))
-
-
 while True:
-    record = get_record()
-    dx, rotate = 0, False
+
+    mover_eje_x, rotar = 0, False
     sc.blit(bg, (0, 0))
-    sc.blit(game_sc, (20, 20))
-    game_sc.blit(game_bg, (0, 0))
-    # delay for full lines
+    sc.blit(ventana_juego, (20, 20))
+    ventana_juego.blit(game_bg, (0, 0))
+    # retraso para puntuar
     for i in range(comboLineas):
         pygame.time.wait(200)
-    # control
+    # EVENTOS
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             exit()
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
-                dx = -1
+                mover_eje_x = -1
             elif event.key == pygame.K_RIGHT:
-                dx = 1
+                mover_eje_x = 1
             elif event.key == pygame.K_DOWN:
-                anim_limit = 100
+                # Cambio la velocidad para que caiga rapido
+                velocidad_limite = 100
+            elif event.key == pygame.K_SPACE:
+                velocidad_limite = 100
             elif event.key == pygame.K_UP:
-                rotate = True
-    # move x
-    figure_old = deepcopy(figure)
+                rotar = True
+        if event.type == pygame.KEYUP:
+            if event.key==pygame.K_DOWN:
+                # Cambio la velocidad para que reinicie su velocidad normal
+                velocidad_limite=2000
+    # Movimiento de la figura eje x
+    figura_anterior = deepcopy(figura_actual)
     for i in range(4):
-        figure[i].x += dx
-        if not check_borders():
-            figure = deepcopy(figure_old)
+        figura_actual[i].x += mover_eje_x
+        if not comprobar_bordes():
+            figura_actual = deepcopy(figura_anterior)
             break
-    # move y
-    anim_count += anim_speed
-    if anim_count > anim_limit:
-        anim_count = 0
-        figure_old = deepcopy(figure)
+    # Movimiento de la figura eje y
+    contador_velocidad += velocidad_animacion
+    if contador_velocidad > velocidad_limite:
+        contador_velocidad = 0
+        figura_anterior = deepcopy(figura_actual)
         for i in range(4):
-            figure[i].y += 1
-            if not check_borders():
+            figura_actual[i].y += 1
+            if not comprobar_bordes():
                 for i in range(4):
-                    tablero[figure_old[i].y][figure_old[i].x] = color
-                figure, color = next_figure, next_color
-                next_figure, next_color = deepcopy(choice(figuras)), get_color()
-                anim_limit = 2000
+                    tablero[figura_anterior[i].y][figura_anterior[i].x] = color_actual
+                figura_actual, color_actual = siguiente_figura, siguiente_color
+                siguiente_figura, siguiente_color = deepcopy(choice(figuras)), get_color()
+                velocidad_limite = 2000
                 break
-    # rotate
-    center = figure[0]
-    figure_old = deepcopy(figure)
-    if rotate:
+    # Girar
+    centro_rotacion = figura_actual[0]
+    figura_anterior = deepcopy(figura_actual)
+    if rotar:
         for i in range(4):
-            x = figure[i].y - center.y
-            y = figure[i].x - center.x
-            figure[i].x = center.x - x
-            figure[i].y = center.y + y
-            if not check_borders():
-                figure = deepcopy(figure_old)
+            x = figura_actual[i].y - centro_rotacion.y
+            y = figura_actual[i].x - centro_rotacion.x
+            figura_actual[i].x = centro_rotacion.x - x
+            figura_actual[i].y = centro_rotacion.y + y
+            if not comprobar_bordes():
+                figura_actual = deepcopy(figura_anterior)
                 break
-    # check lines
-    line, comboLineas = FILAS - 1, 0
-    for row in range(FILAS - 1, -1, -1):
-        count = 0
+    # Comprobar lineas
+    linea, comboLineas = FILAS - 1, 0
+    for fila_comprobar in range(FILAS - 1, -1, -1):
+        # contador de columnas
+        num_filas = 0
         for i in range(COLUMNAS):
-            if tablero[row][i]:
-                count += 1
-            tablero[line][i] = tablero[row][i]
-        if count < COLUMNAS:
-            line -= 1
+            if tablero[fila_comprobar][i]:
+                # sumo 1 al contador si coincide
+                num_filas += 1
+            # paso a la siguiente linea
+            tablero[linea][i] = tablero[fila_comprobar][i]
+        # Si hay la misma cantidad de columnas en el contador que en total hay una linea completa
+        # no coincide
+        if num_filas < COLUMNAS:
+            linea -= 1
+        # Coincide y sumo para luego puntuar
         else:
-            anim_speed += 3
+            velocidad_animacion += 3
             comboLineas += 1
-    # compute score
+    # Puntuo acorde a la cantidad de lineas que se hayan hecho
     score += puntosCombo[comboLineas]
-    # draw grid
-    [pygame.draw.rect(game_sc, (40, 40, 40), i_rect, 1) for i_rect in lineasTablero]
-    # draw figure
+    # Pintar pantalla
+    [pygame.draw.rect(ventana_juego, (40, 40, 40), i_rect, 1) for i_rect in lineasTablero]
+    # dibujar figura
     for i in range(4):
-        figure_rect.x = figure[i].x * TAMFILA
-        figure_rect.y = figure[i].y * TAMFILA
-        pygame.draw.rect(game_sc, color, figure_rect)
-    # draw field
+        tam_linea_figura.x = figura_actual[i].x * TAMFILA
+        tam_linea_figura.y = figura_actual[i].y * TAMFILA
+        pygame.draw.rect(ventana_juego, color_actual, tam_linea_figura)
+    # Pintar tablero
     for y, raw in enumerate(tablero):
         for x, col in enumerate(raw):
             if col:
-                figure_rect.x, figure_rect.y = x * TAMFILA, y * TAMFILA
-                pygame.draw.rect(game_sc, col, figure_rect)
-    # draw next figure
+                tam_linea_figura.x, tam_linea_figura.y = x * TAMFILA, y * TAMFILA
+                pygame.draw.rect(ventana_juego, col, tam_linea_figura)
+    # Visualizar siguiente figura
     for i in range(4):
-        figure_rect.x = next_figure[i].x * TAMFILA + 380
-        figure_rect.y = next_figure[i].y * TAMFILA + 185
-        pygame.draw.rect(sc, next_color, figure_rect)
-    # draw titles
+        tam_linea_figura.x = siguiente_figura[i].x * TAMFILA + 380
+        tam_linea_figura.y = siguiente_figura[i].y * TAMFILA + 185
+        pygame.draw.rect(sc, siguiente_color, tam_linea_figura)
+    # Pintar textos
     sc.blit(titulo, (485, -10))
     sc.blit(txtScore, (535, 780))
     sc.blit(font.render(str(score), True, pygame.Color('white')), (550, 840))
     sc.blit(txtRecord, (525, 650))
-    sc.blit(font.render(record, True, pygame.Color('gold')), (550, 710))
-    # game over
+    sc.blit(font.render(str(record), True, pygame.Color('gold')), (550, 710))
+    # Perder
     for i in range(COLUMNAS):
         if tablero[0][i]:
-            # quitar record
-            set_record(record, score)
+            # Cambio el record si se supera
+            if record < score:
+                record=score
             tablero = [[0 for i in range(COLUMNAS)] for i in range(FILAS)]
-            anim_count, anim_speed, anim_limit = 0, 60, 2000
+            # Reset de variables
+            contador_velocidad, velocidad_animacion, velocidad_limite = 0, 60, 2000
             score = 0
+            # Redibujo el tablero y pongo una animazion to wapa para cada cuadrado
             for i_rect in lineasTablero:
-                pygame.draw.rect(game_sc, get_color(), i_rect)
-                sc.blit(game_sc, (20, 20))
+                pygame.draw.rect(ventana_juego, get_color(), i_rect)
+                sc.blit(ventana_juego, (20, 20))
                 pygame.display.flip()
-                clock.tick(200)
+                refresco_pantalla.tick(200)
 
     pygame.display.flip()
-    clock.tick(FPS)
+    refresco_pantalla.tick(FPS)
