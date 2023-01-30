@@ -7,6 +7,7 @@ from random import choice, randrange
 COLUMNAS, FILAS = 10, 20
 TAMFILA = 45
 TAMVENTANA = COLUMNAS * TAMFILA, FILAS * TAMFILA
+# Tam pantalla
 RES = 750, 940
 FPS = 60
 
@@ -15,8 +16,10 @@ sc = pygame.display.set_mode(RES)
 ventana_juego = pygame.Surface(TAMVENTANA)
 refresco_pantalla = pygame.time.Clock()
 
+# Pinto las lineas del tablero
 lineasTablero = [pygame.Rect(x * TAMFILA, y * TAMFILA, TAMFILA, TAMFILA) for x in range(COLUMNAS) for y in range(FILAS)]
 
+# Array de las distinas figuras
 posicionFiguras = [[(-1, 0), (-2, 0), (0, 0), (1, 0)],  # PALO
                    [(0, -1), (-1, -1), (-1, 0), (0, 0)],  # CUADRADO
                    [(-1, 0), (-1, 1), (0, 0), (0, -1)],  # ZETA
@@ -41,18 +44,18 @@ titulo = main_font.render('TETRIS', True, pygame.Color('darkorange'))
 txtScore = font.render('score: ', True, pygame.Color('green'))
 txtRecord = font.render('record: ', True, pygame.Color('purple'))
 
-colores=[(255, 0,   0  ),
-            (0,   150, 0  ),
-            (0,   0,   255),
-            (255, 120, 0  ),
-            (255, 255, 0  ),
-            (180, 0,   255),
-            (0,   220, 220)]
+colores=[(190, 165, 250),
+        (157, 214, 250 ),
+        (148, 242, 206),
+        (190, 224, 135),
+        (232, 199, 146 ),
+        (125, 230, 240),
+        (240, 115, 93)]
 
 get_color = lambda : (randrange(30, 256), randrange(30, 256), randrange(30, 256))
 
 figura_actual, siguiente_figura =deepcopy(choice(figuras)), deepcopy(choice(figuras))
-color_actual, siguiente_color = get_color(), get_color()
+color_actual, siguiente_color = colores[random.randint(0, len(colores)-1)], colores[random.randint(0, len(colores)-1)]
 
 score, record, comboLineas = 0, 0, 0
 
@@ -114,12 +117,14 @@ while True:
                 for i in range(4):
                     tablero[figura_anterior[i].y][figura_anterior[i].x] = color_actual
                 figura_actual, color_actual = siguiente_figura, siguiente_color
-                siguiente_figura, siguiente_color = deepcopy(choice(figuras)), get_color()
+                siguiente_figura = deepcopy(choice(figuras))
+                siguiente_color = colores[random.randint(0, len(colores)-1)]
                 velocidad_limite = 2000
                 break
     # Girar
     centro_rotacion = figura_actual[0]
     figura_anterior = deepcopy(figura_actual)
+    # Compruebo si se quiere girar la pieza
     if rotar:
         for i in range(4):
             x = figura_actual[i].y - centro_rotacion.y
@@ -132,7 +137,7 @@ while True:
     # Comprobar lineas
     linea, comboLineas = FILAS - 1, 0
     for fila_comprobar in range(FILAS - 1, -1, -1):
-        # contador de columnas
+        # Contador de columnas
         num_filas = 0
         for i in range(COLUMNAS):
             if tablero[fila_comprobar][i]:
@@ -141,7 +146,7 @@ while True:
             # paso a la siguiente linea
             tablero[linea][i] = tablero[fila_comprobar][i]
         # Si hay la misma cantidad de columnas en el contador que en total hay una linea completa
-        # no coincide
+        # No coincide
         if num_filas < COLUMNAS:
             linea -= 1
         # Coincide y sumo para luego puntuar
@@ -152,7 +157,7 @@ while True:
     score += puntosCombo[comboLineas]
     # Pintar pantalla
     [pygame.draw.rect(ventana_juego, (40, 40, 40), i_rect, 1) for i_rect in lineasTablero]
-    # dibujar figura
+    # Dibujar figura
     for i in range(4):
         tam_linea_figura.x = figura_actual[i].x * TAMFILA
         tam_linea_figura.y = figura_actual[i].y * TAMFILA
